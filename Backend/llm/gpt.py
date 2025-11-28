@@ -1,0 +1,45 @@
+import json
+import re
+from typing import Optional
+from openai import AsyncOpenAI
+
+
+async def generate_gpt_response(
+    api_key: str,
+    prompt: str,
+    model_name: str = "gpt-4o-mini"
+) -> str:
+
+    try:
+        client = AsyncOpenAI(api_key=api_key)
+        response = await client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        await client.close()
+
+        response_text = response.choices[0].message.content.strip()
+
+        try:
+            cleaned_response = re.sub(r'```json\s*|\s*```', '', response_text).strip()
+            json_data = json.loads(cleaned_response)
+
+
+            return json.dumps(json_data, ensure_ascii=False)
+
+        except (json.JSONDecodeError, ValueError) as e:
+            fallback_response = {
+                "message": response_text,
+                "links": []
+            }
+            return json.dumps(fallback_response, ensure_ascii=False)
+
+    except Exception as e:
+        error_response = {
+            "message": "Xin lỗi, đã có lỗi xảy ra khi xử lý câu hỏi của bạn.",
+            "links": []
+        }
+        return json.dumps(error_response, ensure_ascii=False)
+
+

@@ -1,0 +1,47 @@
+import os
+import json
+import re
+from typing import Optional
+import google.generativeai as genai
+
+
+
+async def generate_gemini_response(
+    api_key: str,
+    prompt: str,
+    model_name: str = "gemini-2.0-flash-001"
+) -> str:
+    
+    try:
+        # Cấu hình GenAI
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
+
+        # Sinh response
+        response_text = model.generate_content(prompt).text.strip()
+        
+        # Parse JSON response
+        try:
+            cleaned_response = re.sub(r'```json\s*|\s*```', '', response_text).strip()
+            json_data = json.loads(cleaned_response)
+
+
+            return json.dumps(json_data, ensure_ascii=False)
+
+        except (json.JSONDecodeError, ValueError) as e:
+            fallback_response = {
+                "message": response_text,
+                "links": []
+            }
+            return json.dumps(fallback_response, ensure_ascii=False)
+
+    except Exception as e:
+        print(f"❌ Lỗi khi gọi Gemini API: {e}")
+        error_response = {
+            "message": "Xin lỗi, đã có lỗi xảy ra khi xử lý câu hỏi của bạn.",
+            "links": []
+        }
+        return json.dumps(error_response, ensure_ascii=False)
+
+
+
