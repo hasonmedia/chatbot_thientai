@@ -25,13 +25,12 @@ def normalize_metadata(meta: Dict) -> Dict:
     return normalized
     
 async def process_uploaded_file(
-    category_id : str,
     file_path: str,
     filename: str,
-    knowledge_base_detail_id: int,
     db,
     chunk_size: int,
-    chunk_overlap: int
+    chunk_overlap: int,
+    detail_id: int
 ) -> bool:
     
     try:
@@ -91,7 +90,8 @@ async def process_uploaded_file(
             chunks_data.append({
                 "id": f"{filename}_chunk_{idx}",
                 "content": chunk,
-                "embedding": list(emb) if hasattr(emb, "__iter__") else [emb]
+                "embedding": list(emb) if hasattr(emb, "__iter__") else [emb],
+                "metadata": {"knowledge_id": str(detail_id)}
             })
         
             
@@ -111,10 +111,10 @@ async def process_uploaded_file(
 
 async def process_rich_text(
     raw_content: str, 
-    knowledge_base_detail_id: int,
     db,
     chunk_size: int,
-    chunk_overlap: int
+    chunk_overlap: int,
+    detail_id: int
 ) -> Dict[str, any]:
     try:
         soup = BeautifulSoup(raw_content, "html.parser")
@@ -156,19 +156,13 @@ async def process_rich_text(
         
         for idx, (text, vector) in enumerate(zip(all_chunks, all_vectors), start=1):
             chunk_id = str(uuid.uuid4())
-            chunk_meta = {
-                "knowledge_id": str(knowledge_base_detail_id),
-                "chunk_index": idx,
-                "content_type": "rich_text"
-            }
             
             # Chuẩn bị data cho ChromaDB
             chunks_data.append({
                 'id': chunk_id,
                 'content': text,
                 'embedding': vector,
-                'metadata': normalize_metadata(chunk_meta),
-                'knowledge_id': knowledge_base_detail_id
+                'metadata': {'knowledge_id': str(detail_id)}
             })
             
             

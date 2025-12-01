@@ -52,11 +52,12 @@ async def add_chunks(
         ids = [chunk['id'] for chunk in chunks]
         documents = [chunk['content'] for chunk in chunks]
         embeddings = [chunk['embedding'] for chunk in chunks]
+        metadatas = [chunk.get('metadata', {}) for chunk in chunks]
 
         collection.add(
             ids=ids,
-            documents=documents,
-            embeddings=embeddings
+            documents=documents,            embeddings=embeddings,
+            metadatas=metadatas
         )
 
         logger.info(f"✅ Đã thêm {len(ids)} documents vào ChromaDB collection '{collection_name}'")

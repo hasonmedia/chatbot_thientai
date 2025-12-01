@@ -164,13 +164,12 @@ async def create_kb_with_files_service(
                 
                 
                 success  = await process_uploaded_file(
-                    category_id,
                     file_path, 
                     file.filename,
-                    knowledge_base_detail_id=detail.id,
                     db=db,
                     chunk_size=chunk_size,
-                    chunk_overlap=chunk_overlap
+                    chunk_overlap=chunk_overlap,
+                    detail_id=detail.id
                 )
                 
                 if success:
@@ -178,7 +177,7 @@ async def create_kb_with_files_service(
                 else:
                     logger.error(f"❌ Lỗi xử lý file: {file.filename}")
                     # Xóa chunks (nếu có)
-                    await delete_chunks(detail.id)
+                    await delete_chunks(str(detail.id))
                     
                     # Xóa detail DB
                     await db.delete(detail)
@@ -190,7 +189,7 @@ async def create_kb_with_files_service(
             except Exception as e:
                 logger.error(f"Lỗi khi xử lý file {file.filename}: {str(e)}")
                 if detail and detail.id:
-                    await delete_chunks(detail.id)
+                    await delete_chunks(str(detail.id))
                     try:
                         await db.delete(detail)
                         await db.commit()
@@ -246,10 +245,10 @@ async def add_kb_rich_text_service(
         # Truyền chunk_size và chunk_overlap vào process_rich_text
         success = await process_rich_text(
             raw_content,
-            knowledge_base_detail_id=detail.id,
             db=db,
             chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap
+            chunk_overlap=chunk_overlap,
+            detail_id=detail.id
         )
         
         if success:
@@ -257,7 +256,7 @@ async def add_kb_rich_text_service(
         
         else:
             
-            await delete_chunks(detail.id)
+            await delete_chunks(str(detail.id))
             await db.delete(detail)
             await db.commit() 
             
@@ -294,60 +293,48 @@ async def update_kb_with_rich_text_service(
             logger.error(f"Lỗi: detail_id={detail_id} không phải là RICH_TEXT.")
             return None
             
-        kb = detail.knowledge_base
-        if not kb:
-             logger.error(f"Không tìm thấy KnowledgeBase cha cho detail_id={detail_id}.")
-             return None
-
-        # Bước 2: Cập nhật thuộc tính (chưa commit)
-        if customer_id is not None:
-            kb.customer_id = customer_id
+        # Bước 2: Lấy chunk_size và chunk_overlap
+        llm_result = await db.execute(select(LLM).filter(LLM.id == 1))
+        llm = llm_result.scalar_one_or_none()
+        chunk_size = llm.chunksize if llm and llm.chunksize else 500
+        chunk_overlap = llm.chunkoverlap if llm and llm.chunkoverlap else 50
         
+        # Bước 3: Cập nhật thuộc tính
         detail.raw_content = raw_content
         detail.user_id = user_id
         detail.file_name = file_name
         
-        logger.info(f"Đã cập nhật thuộc tính cho detail_id={detail_id} (chưa commit).")
+        logger.info(f"Đã cập nhật thuộc tính cho detail_id={detail_id}")
 
-        # Bước 3: Xóa chunks cũ (chưa commit)
-        # Hàm delete_chunks_by_detail_id không nhận tham số db
-        logger.info(f"Đang xóa các chunks cũ của detail_id={detail.id} (transaction)")
-        await delete_chunks_by_detail_id(detail_id) # Không truyền db parameter
+        # Bước 4: Xóa chunks cũ
+        logger.info(f"Đang xóa các chunks cũ của detail_id={detail.id}")
+        await delete_chunks(str(detail_id))
 
-        # Bước 4: Tạo chunks mới (chưa commit)
-        logger.info(f"Đang tạo chunks mới cho detail_id={detail.id} (transaction)")
-        text_result = await process_rich_text(
+        # Bước 5: Tạo chunks mới
+        logger.info(f"Đang tạo chunks mới cho detail_id={detail.id}")
+        success = await process_rich_text(
             raw_content=raw_content,
-            knowledge_base_detail_id=detail.id
+            db=db,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            detail_id=detail.id
         )
 
-        if not text_result['success']:
-            # Nếu thất bại, ném Exception để kích hoạt rollback ở khối 'except'
-            error_msg = f"LỖI TÁI TẠO CHUNK: {text_result.get('error')}"
+        if not success:
+            error_msg = f"LỖI TÁI TẠO CHUNK cho detail_id={detail_id}"
             logger.error(error_msg)
+            await db.rollback()
             raise Exception(error_msg)
         
-        logger.info(f"Đã tạo {text_result.get('chunks_created', 0)} chunks mới.")
+        logger.info(f"Đã tạo chunks mới thành công")
 
-        # Bước 5: Commit MỘT LẦN DUY NHẤT
-        # Chỉ commit khi tất cả các bước trên thành công
+        # Bước 6: Commit
         await db.commit()
-        logger.info(f"Đã commit thành công toàn bộ thay đổi cho detail_id={detail_id}.")
-
-        # Bước 6: SỬA LỖI MissingGreenlet
-        # Tải lại 'kb' với đầy đủ quan hệ để trả về
-        stmt = (
-            select(KnowledgeBase)
-            .options(
-                selectinload(KnowledgeBase.details)
-                .selectinload(KnowledgeBaseDetail.user)
-            )
-            .filter(KnowledgeBase.id == kb.id)
-        )
-        result = await db.execute(stmt)
-        refreshed_kb = result.scalar_one_or_none()
+        logger.info(f"Đã commit thành công toàn bộ thay đổi cho detail_id={detail_id}")
         
-        return _convert_kb_to_dict(refreshed_kb)
+        # Refresh detail để trả về
+        await db.refresh(detail)
+        return detail
 
     except Exception as e:
         logger.error(f"Lỗi nghiêm trọng khi cập nhật rich text (detail_id={detail_id}), ĐANG ROLLBACK: {str(e)}")
@@ -414,7 +401,7 @@ def _convert_kb_to_dict(kb: KnowledgeBase, category_ids: Optional[List[int]] = N
 
 async def delete_kb_detail_service(detail_id: int, db: AsyncSession):
     try:
-        await delete_chunks(detail_id)
+        await delete_chunks(str(detail_id))
         detail = await db.get(KnowledgeBaseDetail, detail_id)
         await db.delete(detail)
         await db.commit()
@@ -597,7 +584,7 @@ async def delete_category_service(category_id: int, db: AsyncSession):
         details = details_result.scalars().all()
         
         for detail in details:
-            await delete_chunks_by_detail_id(detail.id)
+            await delete_chunks(str(detail.id))
             logger.info(f"Đã xóa chunks của detail_id={detail.id}")
         
         # Xóa category (cascade sẽ xóa các details)
