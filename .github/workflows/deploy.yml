@@ -44,10 +44,10 @@ jobs:
         uses: appleboy/ssh-action@v1.0.1
         with:
           host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
+          username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           scripts: |
-            PROJECT_PATH="/home/${{ secrets.VPS_USERNAME }}/thientai"
+            PROJECT_PATH="/home/${{ secrets.SSH_USER }}/thientai"
             cd $PROJECT_PATH
             
             docker compose -f docker-compose.yml pull
