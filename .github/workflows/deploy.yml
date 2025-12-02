@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: thientai
     env:
-      DOCKER_REPO: ${{ serects.DOCKER_USERNAME }}
+      DOCKER_REPO: ${{ secrets.DOCKER_USERNAME }}
       BE_IMAGE: backend
       FE_IMAGE: frontend
 
