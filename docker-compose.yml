@@ -9,6 +9,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - fe_static_data: /usr/share/nginx/html
     depends_on:
       - backend
       - frontend
@@ -18,7 +19,8 @@ services:
       context: ./Frontend
       dockerfile: ./Frontend/Dockerfile
     container_name: frontend_container
-
+    volumes:
+      - fe_static_data: /app/dist
   backend:
     build:
       context: ./Backend
@@ -55,3 +57,4 @@ volumes:
   db_data:
   redis_data:
   chroma_data:
+  fe_static_data:
