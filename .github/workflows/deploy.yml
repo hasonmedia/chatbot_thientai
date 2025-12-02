@@ -23,7 +23,10 @@ jobs:
         with:
           username: ${{ env.DOCKER_REPO }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
+          
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
       - name: Build and Push Backend Image
         uses: docker/build-push-action@v5
         with: 
@@ -31,7 +34,7 @@ jobs:
           file: ./Backend/Dockerfile
           push: true
           tags: ${{ env.DOCKER_REPO }}/${{ env.BE_IMAGE }}:latest
-          platforms: linux/arm64
+          platforms: linux/arm64,linux/amd64
           
       - name: Build and Push Frontend Image
         uses: docker/build-push-action@v5
