@@ -1,25 +1,22 @@
 FROM python:3.11-slim
 
-# Set working dir
+# Thiết lập thư mục làm việc
 WORKDIR /app
 
-# Cài đặt các dependency hệ thống tối thiểu (ví dụ psycopg2 cần libpq)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libpq-dev build-essential \
+# 1. Cài đặt các gói hệ thống cần thiết cho RUNTIME (Không cần build-essential)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy file requirements trước (tận dụng cache)
-COPY requirements.txt . 
+# 2. Copy các Python dependencies đã được cài đặt từ Stage Builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 
-# Cài Python dependencies
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
-
-# Copy toàn bộ source
+# 3. Copy toàn bộ mã nguồn ứng dụng
 COPY . .
 
-# Expose port
+# 4. Expose port
 EXPOSE 8000
 
-# Chạy bằng Uvicorn
+# 5. Lệnh chạy ứng dụng bằng Uvicorn
+# Lưu ý: Nếu có lỗi kết nối DB, bạn nên dùng ENTRYPOINT là một script chờ (entrypoint.sh)
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--loop", "asyncio"]
