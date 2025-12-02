@@ -8,7 +8,7 @@ on:
 jobs:
   build-push-deploy:
     runs-on: ubuntu-latest
-
+    environment: thientai
     env:
       DOCKER_REPO: ${{ serects.DOCKER_USERNAME }}
       BE_IMAGE: backend
@@ -49,7 +49,20 @@ jobs:
           scripts: |
             PROJECT_PATH="/home/${{ secrets.SSH_USER }}/thientai"
             cd $PROJECT_PATH
-            
+            echo "ACCESS_TOKEN_EXPIRE_MINUTES=${{ vars.ACCESS_TOKEN_EXPIRE_MINUTES }}" >> .env
+            echo "DATABASE_URL=${{ vars.DATABASE_URL }}" > .env
+            echo "REDIS_HOST=${{ vars.REDIS_HOST }}" >> .env
+            echo "REDIS_DB=${{ vars.REDIS_DB }}" >> .env
+            echo "REDIS_DEFAULT_TTL=${{ vars.REDIS_DEFAULT_TTL }}" >> .env
+            echo "REDIS_PORT=${{ vars.REDIS_PORT }}" >> .env
+            echo "REDIS_URL=${{ vars.REDIS_URL }}" >> .env
+            echo "REFRESH_TOKEN_EXPIRE_DAYS=${{ vars.REFRESH_TOKEN_EXPIRE_DAYS }}" >> .env
+            echo "URL=${{ vars.URL }}" >> .env
+            echo "URL_BE=${{ vars.URL_BE }}" >> .env
+            echo "URL_IMAGE=${{ vars.URL_IMAGE }}" >> .env
+            echo "URL_WS=${{ vars.URL_WS }}" >> .env
+            echo "ALGORITHM=${{ secrets.ALGORITHM }}" >> .env
+            echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
             docker compose -f docker-compose.yml pull
             
             docker compose -f docker-compose.yml up -d --remove-orphans
