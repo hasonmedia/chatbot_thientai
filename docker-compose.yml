@@ -28,13 +28,12 @@ services:
       DATABASE_URL: postgresql+asyncpg://thientai:thientai@db:5432/database_thientai
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      CHROMA_HOST: chroma
-      CHROMA_PORT: 8000
+      CHROMA_DATA_PATH: /app/chroma_data
     depends_on:
       - db
       - redis
-      - chroma
-
+    volumes:
+      - chroma_data:/app/chroma_data
   db:
     image: postgres:17
     container_name: postgres_db
@@ -51,14 +50,6 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-
-  chroma: 
-    image: chromadb/chroma:latest 
-    container_name: chroma_vector_db
-    environment:
-      CHROMA_TELEMETRY_ANALYTICS_ON: "False"
-    volumes:
-      - chroma_data:/chroma/data 
       
 volumes: 
   db_data:
