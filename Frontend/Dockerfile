@@ -1,8 +1,11 @@
-FROM nginx:alpine
+FROM node:lts-alpine as builder
 
-COPY dist/ /usr/share/nginx/html/
+WORKDIR /app
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY package*.json ./
+RUN npm install
 
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+COPY . .
+
+# Lệnh BUILD tạo ra file tĩnh, giả sử vào thư mục /app/dist
+RUN npm run build
