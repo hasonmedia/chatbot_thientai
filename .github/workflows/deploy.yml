@@ -49,8 +49,12 @@ jobs:
           scripts: |
             PROJECT_PATH="/home/${{ secrets.SSH_USER }}/thientai"
             cd $PROJECT_PATH
-            echo "ACCESS_TOKEN_EXPIRE_MINUTES=${{ vars.ACCESS_TOKEN_EXPIRE_MINUTES }}" >> .env
-            echo "DATABASE_URL=${{ vars.DATABASE_URL }}" > .env
+          
+            # Dùng > (overwrite) cho dòng đầu tiên
+            echo "ACCESS_TOKEN_EXPIRE_MINUTES=${{ vars.ACCESS_TOKEN_EXPIRE_MINUTES }}" > .env 
+          
+            # Dùng >> (append) cho TẤT CẢ các dòng tiếp theo
+            echo "DATABASE_URL=${{ vars.DATABASE_URL }}" >> .env
             echo "REDIS_HOST=${{ vars.REDIS_HOST }}" >> .env
             echo "REDIS_DB=${{ vars.REDIS_DB }}" >> .env
             echo "REDIS_DEFAULT_TTL=${{ vars.REDIS_DEFAULT_TTL }}" >> .env
@@ -63,6 +67,7 @@ jobs:
             echo "URL_WS=${{ vars.URL_WS }}" >> .env
             echo "ALGORITHM=${{ secrets.ALGORITHM }}" >> .env
             echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
+            
             docker compose -f docker-compose.yml pull
             
             docker compose -f docker-compose.yml up -d --remove-orphans
