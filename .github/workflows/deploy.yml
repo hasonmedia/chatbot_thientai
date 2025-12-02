@@ -1,48 +1,57 @@
-name: Build and Deploy FE
+name: Fullstack Deployment
 
 on:
   push:
     branches:
-      - hcc_v1 # chỉ chạy khi push lên nhánh main
-permissions:
-  contents: write
+      - develop 
 
 jobs:
-  build:
+  build-push-deploy:
     runs-on: ubuntu-latest
+
+    env:
+      DOCKER_REPO: ${{ serects.DOCKER_USERNAME }}
+      BE_IMAGE: backend
+      FE_IMAGE: frontend
+
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: action/checkout@v4
 
-      - name: Setup NodeJS
-        uses: actions/setup-node@v3
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          node-version: 20
+          username: ${{ env.DOCKER_REPO }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Install dependencies
-        run: npm install
-        working-directory: ./Frontend
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v5
+        with: 
+          context: ./Backend
+          file: ./Backend/Dockerfile
+          push: true
+          tags: ${{ env.DOCKER_REPO }}/${{ env.BE_IMAGE }}:latest
 
-      - name: Build project
-        run: npm run build
-        working-directory: ./Frontend
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Frontend
+          file: ./Frontend/Dockerfile
+          push: true
+          tags: ${{ env.DOCKER_REPO }}/${{ env.FE_IMAGE }}:latest
 
-      - name: Deploy to branch
-        run: |
-          rm -rf .git
-          mkdir deploy
-          # copy nguyên dist folder
-          cp -r Frontend/dist deploy/
-          # copy Dockerfile và nginx.conf
-          cp Frontend/Dockerfile deploy/
-          cp Frontend/nginx.conf deploy/
-
-          cd deploy
-          git init
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add .
-          git commit -m "Deploy FE"
-          git branch -M deploy
-          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git push -f origin deploy
+      - name: Deploy to VPS with Docker compose
+        uses: appleboy/ssh-action@v1.0.1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          scripts: |
+            PROJECT_PATH="/home/${{ secrets.VPS_USERNAME }}/thientai"
+            cd $PROJECT_PATH
+            
+            docker compose -f docker-compose.yml pull
+            
+            docker compose -f docker-compose.yml up -d --remove-orphans
+            
+            docker image prune -f
