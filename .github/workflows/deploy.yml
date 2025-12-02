@@ -43,9 +43,9 @@ jobs:
       - name: Deploy to VPS with Docker compose
         uses: appleboy/ssh-action@v1.0.1
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
           scripts: |
             PROJECT_PATH="/home/${{ secrets.VPS_USERNAME }}/thientai"
             cd $PROJECT_PATH
