@@ -75,5 +75,11 @@ jobs:
             docker compose -f docker-compose.yml pull
             
             docker compose -f docker-compose.yml up -d --remove-orphans
+            echo "Copying Frontend static files from container to Nginx volume..."
+            VOLUME_NAME="thientai_fe_static_data"
+            sudo docker cp frontend_container:/app/dist/. $(sudo docker volume inspect $VOLUME_NAME -f '{{.Mountpoint}}')
+            docker stop frontend_container || true
+            docker rm frontend_container || true
             
+            # Dọn dẹp các Image cũ không dùng
             docker image prune -f
