@@ -15,22 +15,16 @@ services:
       - frontend
 
   frontend:
-    build: 
-      context: ./Frontend
-      dockerfile: ./Frontend/Dockerfile
+    image: ${{ secrets.DOCKER_USERNAME }}/frontend:latest
     container_name: frontend_container
-    volumes:
-      - fe_static_data: /app/dist
+    
   backend:
-    build:
-      context: ./Backend
-      dockerfile: ./Backend/Dockerfile
+    image: ${{ secrets.DOCKER_USERNAME }}/backend:latest
     container_name: backend_container 
-    environment:
-      DATABASE_URL: postgresql+asyncpg://thientai:thientai@db:5432/database_thientai
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      CHROMA_DATA_PATH: /app/chroma_data
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
     depends_on:
       - db
       - redis
