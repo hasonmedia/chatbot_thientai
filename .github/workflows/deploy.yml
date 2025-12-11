@@ -1,85 +1,54 @@
-name: Fullstack Deployment
+name: Build and Deploy FE
 
 on:
   push:
     branches:
-      - develop 
+      - production 
 
 jobs:
-  build-push-deploy:
+  deploy:
     runs-on: ubuntu-latest
-    environment: thientai
-    env:
-      DOCKER_REPO: ${{ secrets.DOCKER_USERNAME }}
-      BE_IMAGE: backend
-      FE_IMAGE: frontend
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Deploy using ssh
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: 22
+          script: |
+            cd /var/www/chatbot_thientai
+            git fetch origin
+            git checkout production
+            git pull
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKER_REPO }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-          
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        
-      - name: Build and Push Backend Image
-        uses: docker/build-push-action@v5
-        with: 
-          context: ./Backend
-          file: ./Backend/Dockerfile
-          push: true
-          tags: ${{ env.DOCKER_REPO }}/${{ env.BE_IMAGE }}:latest
-          platforms: linux/arm64,linux/amd64
-          
-      - name: Build and Push Frontend Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./Frontend
-          file: ./Frontend/Dockerfile
-          push: true
-          tags: ${{ env.DOCKER_REPO }}/${{ env.FE_IMAGE }}:latest
+            echo "POSTGRES_USER=${{ secrets.POSTGRES_USER }}" > Backend/.env
+            echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> Backend/.env
+            echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> Backend/.env
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> Backend/.env
+            
+            echo "" >> Backend/.env
+            echo "# Redis" >> Backend/.env
+            echo "REDIS_HOST=${{ secrets.REDIS_HOST }}" >> Backend/.env
+            echo "REDIS_PORT=${{ secrets.REDIS_PORT }}" >> Backend/.env
+            echo "REDIS_DEFAULT_TTL=${{ secrets.REDIS_DEFAULT_TTL }}" >> Backend/.env
+            echo "REDIS_URL=redis://${{ secrets.REDIS_HOST }}:${{ secrets.REDIS_PORT }}/0" >> Backend/.env
+            
+            echo "" >> Backend/.env
+            echo "# Chroma" >> Backend/.env
+            echo "CHROMA_DATA_PATH=${{ secrets.CHROMA_DATA_PATH }}" >> Backend/.env
+            
+            echo "" >> Backend/.env
+            echo "# App secret" >> Backend/.env
+            echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> Backend/.env
+            
+            echo "" >> Backend/.env
+            echo "# URLs" >> Backend/.env
+            echo "URL=${{ secrets.URL }}" >> Backend/.env
+            echo "URL_BE=${{ secrets.URL_BE }}" >> Backend/.env
+            echo "URL_WS=${{ secrets.URL_WS }}" >> Backend/.env
+            echo "URL_IMAGE=${{ secrets.URL_IMAGE }}" >> Backend/.env
 
-      - name: Deploy to VPS with Docker compose
-        uses: appleboy/ssh-action@v1.0.1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          scripts: |
-            PROJECT_PATH="/home/${{ secrets.SSH_USER }}/thientai"
-            cd $PROJECT_PATH
-          
-            # Dùng > (overwrite) cho dòng đầu tiên
-            echo "ACCESS_TOKEN_EXPIRE_MINUTES=${{ vars.ACCESS_TOKEN_EXPIRE_MINUTES }}" > .env 
-          
-            # Dùng >> (append) cho TẤT CẢ các dòng tiếp theo
-            echo "DATABASE_URL=${{ vars.DATABASE_URL }}" >> .env
-            echo "REDIS_HOST=${{ vars.REDIS_HOST }}" >> .env
-            echo "REDIS_DB=${{ vars.REDIS_DB }}" >> .env
-            echo "REDIS_DEFAULT_TTL=${{ vars.REDIS_DEFAULT_TTL }}" >> .env
-            echo "REDIS_PORT=${{ vars.REDIS_PORT }}" >> .env
-            echo "REDIS_URL=${{ vars.REDIS_URL }}" >> .env
-            echo "REFRESH_TOKEN_EXPIRE_DAYS=${{ vars.REFRESH_TOKEN_EXPIRE_DAYS }}" >> .env
-            echo "URL=${{ vars.URL }}" >> .env
-            echo "URL_BE=${{ vars.URL_BE }}" >> .env
-            echo "URL_IMAGE=${{ vars.URL_IMAGE }}" >> .env
-            echo "URL_WS=${{ vars.URL_WS }}" >> .env
-            echo "ALGORITHM=${{ secrets.ALGORITHM }}" >> .env
-            echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> .env
-            
-            docker compose -f docker-compose.yml pull
-            
-            docker compose -f docker-compose.yml up -d --remove-orphans
-            echo "Copying Frontend static files from container to Nginx volume..."
-            VOLUME_NAME="thientai_fe_static_data"
-            sudo docker cp frontend_container:/app/dist/. $(sudo docker volume inspect $VOLUME_NAME -f '{{.Mountpoint}}')
-            docker stop frontend_container || true
-            docker rm frontend_container || true
-            
-            # Dọn dẹp các Image cũ không dùng
-            docker image prune -f
+            docker compose down  || true
+            docker compose build --no-cache
+            docker compose up -d
