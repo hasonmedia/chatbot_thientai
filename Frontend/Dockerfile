@@ -1,11 +1,13 @@
-FROM node:lts-alpine as builder
-
+FROM node:20
+ 
 WORKDIR /app
-
+ 
 COPY package*.json ./
+ 
 RUN npm install
-
+ 
 COPY . .
-
-# Lệnh BUILD tạo ra file tĩnh, giả sử vào thư mục /app/dist
-RUN npm run build
+ 
+EXPOSE 3000
+ 
+CMD [ "npm", "start" ]
